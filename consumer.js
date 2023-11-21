@@ -77,8 +77,8 @@ async function updateS3Objects(
   if (succesfullyProcessedRecords.length > 0) {
     // metrics other than memory usage are ignored for now
     await appendS3Object(
-      "dangra-test-bucket",
-      "memory-consumption-metrics",
+      process.env.BUCKET_NAME,
+      process.env.MEMORY_CONSUMPTION_METRICS_OBJECT_KEY,
       succesfullyProcessedRecords
         .filter(record => record.name === 'memory.usage')
         .map(record => `${record.timestamp}: ${record.value}`)
@@ -88,8 +88,8 @@ async function updateS3Objects(
   
   if (processingFailures.length > 0) {
     await appendS3Object(
-      "dangra-test-bucket",
-      "faulty-metrics",
+      process.env.BUCKET_NAME,
+      process.env.FAULTY_METRICS_OBJECT_KEY,
       processingFailures
         .map(failure => `${failure.reason}: ${failure.body}`)
         .join('\n') + '\n',
