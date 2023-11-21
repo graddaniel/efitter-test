@@ -1,0 +1,86 @@
+Project setup:
+- Create and initialize S3 Bucket to store the results
+- Create SQS FIFO queue to send the metrics from the producer to the consumer 
+- Create consumer Lambda function
+- Configure AWS CLI to use an account with permission to write to the queue
+
+S3 Setup:
+- Create the bucket with default settings and name of your choice
+- Initialize the bucket with two (ex. faulty-metrics, memory-consumption-metrics) empty files,
+    which are going to store the results
+
+SQS Setup:
+- Create an SQS queue with the name of your choice;
+    In the "Details" section select FIFO instead of Standard queue type;
+    In the "Configuration" section modify "Message retention period" to 1 minute;
+    In the "Access Policy" section select "Advanced" and delete the content to specify empty policy
+
+Lambda setup:
+- Create a new Lambda function with the name of your choice;
+    Select "Node.js 18.x" runtime (or other of your choice, which supports the consumer's features)
+- Edit the newly created function's execution role by switching to "Configuration" tab,
+    selecting "Permissions" from the menu on the left,
+    clicking the role's name at the top of the "Execution Role" section,
+    expanding the policy in the "Permission policies" section of the newly opened page,
+    clicking "Edit" of the newly expanded section,
+    adding following data to the policy's statement:
+    {
+        "Effect": "Allow",
+        "Action": [
+            "sqs:ReceiveMessage",
+            "sqs:DeleteMessage",
+            "sqs:GetQueueAttributes"
+        ],
+        "Resource": [
+            "<your queue's ARN>"
+        ]
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "s3:PutObject",
+            "s3:PutObjectAcl",
+            "s3:GetObject",
+            "s3:GetObjectAcl",
+            "s3:AbortMultipartUpload"
+        ],
+        "Resource": [
+            "<your bucket's ARN>",
+            "<your bucket's ARN>/*"
+        ]
+    }
+- Add an SQS trigger, by pressing "Add trigger" button and specifying your SQS queue
+- Add a lambda layer containing AWS SDK, matching previously specified Node.js runtime
+- Edit the function's code by pasting the "consumer.js" content, or uploading the file
+- Edit the Environmental Variables in "Configuration" > "Environmental variables" section,
+    specifying following variables, according to your S3 Bucket setup:
+    BUCKET_NAME	<your bucket's name>
+    FAULTY_METRICS_OBJECT_KEY <name of the object, to store faulty results>
+    MEMORY_CONSUMPTION_METRICS_OBJECT_KEY <name of the object, to store the metrics>
+
+CLI Setup
+- Install AWS CLI and configure it ("aws configure") by specifying the credentials
+    of the account used by the producer
+- Grant the account permissions to send messages to the queue,
+    for examply by editing its IAM policy. Ex.:
+    {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Sid": "sid1",
+                "Effect": "Allow",
+                "Action": "sqs:SendMessage",
+                "Resource": <your queue's ARN>
+            }
+        ]
+    }
+
+
+Once the project is set up, run the code by executing "node producer.js".
+The bucket's objects will get updated with the results
+
+Improvement ideas:
+-Locking the S3 file with DynamoDB, to prevent concurrent access
+-More precise data validation with more descriptive errors
+-Currently every record is being stored in the file;
+    These could be aggregated to provide smaller granularity and reduce S3 space consumption
